@@ -31,11 +31,11 @@ module NonBlockingSocket
           @recv_buffer += received
           @last_recv = Time.now
         end
-        puts "recv_buffer: '#{recv_buffer}'"
+        # puts "recv_buffer: '#{recv_buffer}'"
 
-        m = Method.build_from_frame(recv_buffer)
-        @recv_buffer = recv_buffer[m.size+8..-1]
-        puts "recv_buffer: '#{recv_buffer}'"
+        m = AMQPMethod.build_from_frame(recv_buffer)
+        @recv_buffer = @recv_buffer[m.size+8..-1]
+        # puts "recv_buffer: '#{recv_buffer}'"
         return m
       end
     rescue
@@ -52,9 +52,9 @@ module NonBlockingSocket
       while not send_buffer.empty?
         written = socket.write_nonblock(send_buffer)
         @last_send = Time.now
-        puts "sent #{written} bytes"
-        @send_buffer = send_buffer[written..-1]
-        puts "now send_buffer is '#{send_buffer}'"
+        #puts "sent #{written} bytes"
+        @send_buffer = @send_buffer[written..-1]
+        #puts "now send_buffer is '#{send_buffer}'"
       end
     rescue
       if blocking

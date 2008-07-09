@@ -2,16 +2,49 @@
 module Rubbyt
 
 class AMQPMethod
+  @@list = Array.new
+  @@lookup = Hash.new
   class << self
+    def build_from_frame(data)
+      raise AMQPIncompleteFrame(:header) if data.length < 7
+      type, channel, size = data.read(:octet, :short, :long)
+      #p "type #{type}"
+      #p "channel #{channel}"
+      #p "size #{size}"
+
+      raise AMQPIncompleteFrame(:payload) if data.length < size+8
+      raise AMQPIncompleteFrame(:frame_end) if data[size+7] != AMQP_FRAME_END
+
+      class_id, method_id = data.read(:short, :short)
+      m = AMQPMethod.find(class_id, method_id).clone
+      m.update(:type => type, :channel => channel, :size => size)
+      m.unpack(data)
+
+      puts "\nBuilt AMQPMethod instance from frame:\n#{m.inspect}"
+      return m
+    end
+
     def find_all_by_class_id
+      # FIXME
     end
 
     def find_all_by_class_name
+      # FIXME
     end
 
-    def find
+    def find(class_id, method_id)
+      # FIXME is this efficient?
+      @@list[@@lookup[class_id][method_id]]
     end
+
+    def call_attr_accessor(sym)
+      attr_accessor(sym)
+    end
+      
   end
+
+  attr_reader :fields, :field_names
+  attr_accessor :type, :channel, :size
 
   def initialize(class_id, method_id, class_name, method_name, &block)
     @class_id = class_id
@@ -19,19 +52,40 @@ class AMQPMethod
     @class_name = class_name
     @method_name = method_name
     @fields = Array.new
+    @field_names = Array.new
     block.call(self)
 
-    # FIXME add self to lookup tables/maps
+    @@list << self
+    @@lookup[class_id] ||= Hash.new
+    @@lookup[class_id][method_id] = @@list.length - 1
   end
 
+  # this method is here to pass data we got from frame inside into method
+  # FIXME
+  # need a better way
+  # also, is frame type always 1?
+  def update(opts)
+    @type = opts[:type]
+    @channel = opts[:channel]
+    @size = opts[:size]
+  end
+    
+
   def field(name, type)
-    @fields << FIXME
+    @fields << [name, type]
+    @field_names << name
+    self.class.call_attr_accessor(name)
   end
 
   def unpack(s)
+    fields.each do |fld|
+      send("#{fld[0]}=", s.read(fld[1]))
+    end
+    self
   end
 
   def pack
+    # FIXME
   end
     
 end
@@ -117,9 +171,9 @@ String.class_eval do
   end
 
   def _read_table
+    # to a certain extent, based on pyamqplib
     table = Hash.new
     table_data = read(:longstr)
-    p table_data
 
     while not table_data.eof?
       key = table_data.read(:shortstr)
@@ -136,7 +190,8 @@ String.class_eval do
 #          val = table_data.read(:timestamp) <-- FIXME
 #        when 'F':
 #          val = table_data.read(:table)
-        else
+        else 
+          # FIXME raise an exception instead of exit
           p "Unknown type in _read_table: #{type}"
           exit
       end
@@ -148,35 +203,47 @@ String.class_eval do
 end
 
 
-class Method
-  attr_reader :size, :class_id, :method_id
-
-  def self.build_from_frame(data)
-    raise AMQPIncompleteFrame(:header) if data.length < 7
-    type, chan, size = data.read(:octet, :short, :long)
-    raise AMQPIncompleteFrame(:payload) if data.length < size+8
-    raise AMQPIncompleteFrame(:frame_end) if data[size+7] != AMQP_FRAME_END
-
-    Method.new(data[7..size+7], type, chan, size)
-  end
-
-  def initialize(data, type, chan, size)
-    @class_id, @method_id = data.read(:short, :short)
-    p "Received method: #{@class_id},#{@method_id}"
-
-    if @class_id == 10 && @method_id == 10
-      @version_major, @minor = data.read(:octet, :octet)
-    p "B"
-    puts @major, @minor
-
-    @prop = data.read(:table)
-    p "C"
-    p @prop
-
-    exit
-
-  end
-end
+#class Method
+#
+#  def self.build_from_frame(data)
+#    raise AMQPIncompleteFrame(:header) if data.length < 7
+#    type, chan, size = data.read(:octet, :short, :long)
+#    p "type #{type}"
+#    p "channel #{chan}"
+#    p "size #{size}"
+#
+#    raise AMQPIncompleteFrame(:payload) if data.length < size+8
+#    raise AMQPIncompleteFrame(:frame_end) if data[size+7] != AMQP_FRAME_END
+#
+#    # Method.new(data[7..size+7], type, chan, size)
+#    class_id, method_id = data.read(:short, :short)
+#    m = AMQPMethod.find(class_id, method_id).clone
+#    m.unpack(data)
+#
+#    exit    # FIXME NOTIMPL
+#  end
+#
+#  def initialize(data, type, chan, size)
+#    @class_id, @method_id = data.read(:short, :short)
+#    p "Received method: #{@class_id},#{@method_id}"
+#
+#
+#
+#    if @class_id == 10 && @method_id == 10
+#      @version_major, @minor = data.read(:octet, :octet)
+#    end
+#    p "B"
+#    puts @major, @minor
+#
+#    @prop = data.read(:table)
+#    p "C"
+#    p @prop
+#
+#    exit
+#
+#  end
+#
+#end
 
 end
 

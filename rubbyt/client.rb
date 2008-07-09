@@ -65,8 +65,8 @@ class AMQPConnection
 
   def amqp_recv_start
     m = recv(blocking=true)
-    p m
-    raise "inside amqp_recv_start NOTIMPL FIXME"
+    puts "\ninside amqp_recv_start NOTIMPL FIXME"
+    exit
   end
 
   def amqp_send_start_ok

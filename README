@@ -3,4 +3,9 @@ rubbyt
 
 Ruby AMQP client library for RabbitMQ
 
+Copyright (C) 2007-2008 LShift Ltd., Cohesive Financial Technologies LLC.,
+and Rabbit Technologies Ltd.
+
+Licensed under the MPL 1.1.
+
 

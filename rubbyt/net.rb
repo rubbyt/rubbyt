@@ -13,7 +13,7 @@ module NonBlockingSocket
     @socket = Socket.new(AF_INET, SOCK_STREAM, 0)
     sockaddr = Socket.sockaddr_in(port, host)
     begin
-      socket.connect_nonblock(sockaddr)
+      @socket.connect_nonblock(sockaddr)
     rescue Errno::EINPROGRESS
       IO.select(nil, [@socket])
       begin

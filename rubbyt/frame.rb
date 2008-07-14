@@ -2,6 +2,7 @@
 module Rubbyt
 
 class AMQPMethod
+  attr_reader :method_name, :class_name
   @@list = Array.new
   @@lookup = Hash.new
   class << self

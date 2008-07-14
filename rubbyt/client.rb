@@ -6,7 +6,7 @@ module Rubbyt
 class AMQPConnection
 
   attr_reader :host, :port, :user, :pass, :vhost
-  attr_reader :socket, :send_buffer, :recv_buffer
+  attr_reader :socket, :send_buffer, :recv_buffer, :frame_buffer
   attr_writer :last_recv, :last_send, :last_broker_heartbeat
   attr_reader :server_properties
 
@@ -22,6 +22,7 @@ class AMQPConnection
     @socket = nil
     @send_buffer = ""
     @recv_buffer = ""
+    @frame_buffer = Array.new   # array of queued outgoing frames
 
     @last_recv = nil
     @last_send = nil
@@ -68,6 +69,9 @@ class AMQPConnection
     m = recv(blocking=true)
     @server_properties = m.server_properties
 
+    # make sure it's a start method
+    raise(BrokerCompatError,:unexpected_method) unless
+                m.method_name == :start && m.class_name == :connection
     # make sure broker supports AMQPLAIN
     raise(BrokerCompatError,:broker_does_not_support_amqplain) unless
                 m.mechanisms.split.include?(AMQPLAIN)

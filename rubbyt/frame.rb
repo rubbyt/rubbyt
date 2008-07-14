@@ -6,14 +6,14 @@ class AMQPMethod
   @@lookup = Hash.new
   class << self
     def build_from_frame(data)
-      raise AMQPIncompleteFrame(:header) if data.length < 7
+      raise(AMQPIncompleteFrame,:header) if data.length < 7
       type, channel, size = data.read(:octet, :short, :long)
       #p "type #{type}"
       #p "channel #{channel}"
       #p "size #{size}"
 
-      raise AMQPIncompleteFrame(:payload) if data.length < size+8
-      raise AMQPIncompleteFrame(:frame_end) if data[size+7] != AMQP_FRAME_END
+      raise(AMQPIncompleteFrame,:payload) if data.length < size+8
+      raise(AMQPIncompleteFrame,:frame_end) if data[size+7] != AMQP_FRAME_END
 
       class_id, method_id = data.read(:short, :short)
       m = AMQPMethod.find(class_id, method_id).clone
@@ -98,6 +98,29 @@ AMQPMethod.new(10, 10, :connection, :start) do |m|
   m.field :mechanisms, :longstr
   m.field :locales, :longstr
 end
+
+AMQPMethod.new(10, 11, :connection, :start_ok) do |m|
+  m.field :client_properties, :table
+  m.field :mechanism, :shortstr
+  m.field :response, :table     # for AMQPLAIN - LOGIN/PASSWORD table
+  m.field :locale, :shortstr
+end
+
+# skip secure for now
+
+AMQPMethod.new(10, 30, :connection, :tune) do |m|
+  m.field :channel_max, :short
+  m.field :frame_max, :long
+  m.field :heartbeat, :short
+end
+
+AMQPMethod.new(10, 31, :connection, :tune_ok) do |m|
+  m.field :channel_max, :short
+  m.field :frame_max, :short
+  m.field :heartbeat, :short
+end
+
+
 
 
 

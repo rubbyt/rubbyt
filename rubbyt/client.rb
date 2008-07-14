@@ -8,6 +8,7 @@ class AMQPConnection
   attr_reader :host, :port, :user, :pass, :vhost
   attr_reader :socket, :send_buffer, :recv_buffer
   attr_writer :last_recv, :last_send, :last_broker_heartbeat
+  attr_reader :server_properties
 
   include NonBlockingSocket
 
@@ -65,9 +66,20 @@ class AMQPConnection
 
   def amqp_recv_start
     m = recv(blocking=true)
-    puts "\ninside amqp_recv_start NOTIMPL FIXME"
+    @server_properties = m.server_properties
+
+    # make sure broker supports AMQPLAIN
+    raise(BrokerCompatError,:broker_does_not_support_amqplain) unless
+                m.mechanisms.split.include?(AMQPLAIN)
+    # make sure major/minor are 8/0
+    raise(BrokerCompatError,:major_minor_mismatch) unless
+                m.version_major == 8 && m.version_minor == 0
+    
+    p "ok"
     exit
   end
+
+
 
   def amqp_send_start_ok
   end

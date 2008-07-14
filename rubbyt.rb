@@ -12,12 +12,14 @@ module Rubbyt
   AMQP_FRAME_END = 206
   DEFAULT_AMQP_MAJOR_VERSION = 8
   DEFAULT_AMQP_MINOR_VERSION = 0
+  AMQPLAIN = "AMQPLAIN".freeze
 
   # Exceptions
-  class Exception < Exception; end
+  class Exception < ::Exception; end
   class AMQPRedirect < Exception; end
   class AMQPIncompleteFrame < Exception; end
   class BufferOverflow < Exception; end
+  class BrokerCompatError < Exception; end
 end
 
 require 'rubbyt/frame'

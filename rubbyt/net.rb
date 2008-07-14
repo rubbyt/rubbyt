@@ -15,7 +15,7 @@ module NonBlockingSocket
     begin
       socket.connect_nonblock(sockaddr)
     rescue Errno::EINPROGRESS
-      IO.select(nil, [socket])
+      IO.select(nil, [@socket])
       begin
         socket.connect_nonblock(sockaddr)
       rescue Errno::EISCONN
@@ -26,21 +26,26 @@ module NonBlockingSocket
   def recv(blocking=false)
     begin
       while true
+        @recv_buffer.rewind!
         received = socket.recv_nonblock(4096)
-        if received
-          @recv_buffer += received
-          @last_recv = Time.now
-        end
-        # puts "recv_buffer: '#{recv_buffer}'"
+        raise(AMQPIncompleteFrame,:nothing_received) unless received
+        @recv_buffer += received
+        @last_recv = Time.now
 
-        m = AMQPMethod.build_from_frame(recv_buffer)
+        raise(AMQPIncompleteFrame,:header) if @recv_buffer.length < 7
+        type, channel, size = @recv_buffer.read(:octet, :short, :long)
+        raise(AMQPIncompleteFrame,:payload) if @recv_buffer.length < size+8
+        raise AMQPBadFrame unless @recv_buffer[size+7] == AMQP_FRAME_END
+
+        m = AMQPMethod.build_from_frame(recv_buffer[7..size+7], type,
+                                        channel, size)
         @recv_buffer = @recv_buffer[m.size+8..-1]
         # puts "recv_buffer: '#{recv_buffer}'"
         return m
       end
-    rescue
+    rescue AMQPIncompleteFrame, Errno::EAGAIN
       if blocking
-        IO.select([socket])
+        IO.select([@socket])
         retry
       end
     end

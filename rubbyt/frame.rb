@@ -5,18 +5,9 @@ class AMQPMethod
   @@list = Array.new
   @@lookup = Hash.new
   class << self
-    def build_from_frame(data)
-      raise(AMQPIncompleteFrame,:header) if data.length < 7
-      type, channel, size = data.read(:octet, :short, :long)
-      #p "type #{type}"
-      #p "channel #{channel}"
-      #p "size #{size}"
-
-      raise(AMQPIncompleteFrame,:payload) if data.length < size+8
-      raise(AMQPIncompleteFrame,:frame_end) if data[size+7] != AMQP_FRAME_END
-
+    def build_from_frame(data, type, channel, size)
       class_id, method_id = data.read(:short, :short)
-      m = AMQPMethod.find(class_id, method_id).clone
+      m = AMQPMethod.create(class_id, method_id)
       m.update(:type => type, :channel => channel, :size => size)
       m.unpack(data)
 
@@ -32,9 +23,12 @@ class AMQPMethod
       # FIXME
     end
 
-    def find(class_id, method_id)
+    def create(class_id, method_id)
       # FIXME is this efficient?
-      @@list[@@lookup[class_id][method_id]]
+      p @@list
+      p class_id
+      p method_id
+      @@list[@@lookup[class_id][method_id]].clone
     end
 
     def call_attr_accessor(sym)
@@ -130,7 +124,7 @@ end
 
 
 String.class_eval do
-  def rewind
+  def rewind!
     @pos = 0
   end
 

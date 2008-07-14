@@ -18,6 +18,7 @@ module Rubbyt
   class Exception < ::Exception; end
   class AMQPRedirect < Exception; end
   class AMQPIncompleteFrame < Exception; end
+  class AMQPBadFrame < Exception; end
   class BufferOverflow < Exception; end
   class BrokerCompatError < Exception; end
 end

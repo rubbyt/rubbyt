@@ -27,6 +27,12 @@ class AMQPConnection
     @last_recv = nil
     @last_send = nil
     @last_broker_heartbeat = nil
+
+    @client_properties ||= { :platform => "Ruby",
+            :product => "Rubbyt",
+            :information => "http://github.com/rubbyt/rubbyt",
+            :version => "0.0",
+            :copyright => "FIXME" }
   end
 
   def connect
@@ -61,7 +67,7 @@ class AMQPConnection
     # this is the only time when we send non-method frame?
     send_buffer << AMQP_PROTO_HEADER << 
       [1, 1, DEFAULT_AMQP_MAJOR_VERSION,
-        DEFAULT_AMQP_MINOR_VERSION].pack("CCCC")
+        DEFAULT_AMQP_MINOR_VERSION].pack("C4")
     send(blocking=true)
   end
 
@@ -69,26 +75,33 @@ class AMQPConnection
     m = recv(blocking=true)
     @server_properties = m.server_properties
 
-    # make sure it's a start method
-    raise(BrokerCompatError,:unexpected_method) unless
+    # make sure it is a start method
+    raise(ProtocolError,:unexpected_method) unless
                 m.method_name == :start && m.class_name == :connection
     # make sure broker supports AMQPLAIN
     raise(BrokerCompatError,:broker_does_not_support_amqplain) unless
                 m.mechanisms.split.include?(AMQPLAIN)
     # make sure major/minor are 8/0
-    raise(BrokerCompatError,:major_minor_mismatch) unless
+    raise(BrokerCompatError,:major_minor_version_mismatch) unless
                 m.version_major == 8 && m.version_minor == 0
-    
-    p "ok"
-    exit
   end
 
-
-
   def amqp_send_start_ok
+    m = AMQPMethod.create(:connection, :start_ok)
+    m.mechanism = AMQPLAIN
+    m.response = { :LOGIN => @user, :PASSWORD => @pass }
+    m.locale = DEFAULT_AMQP_LOCALE
+    m.client_properties = @client_properties
+    @frame_buffer << m
+    send(blocking=true)
   end
 
   def amqp_recv_tune
+    p "inside amqp_recv_tune"
+    m = recv(blocking=true)
+    p m
+
+    exit
   end
 
   def amqp_send_tune_ok

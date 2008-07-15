@@ -5,6 +5,8 @@ class AMQPMethod
   attr_reader :method_name, :class_name
   @@list = Array.new
   @@lookup = Hash.new
+  @@lookup_by_sym = Hash.new
+
   class << self
     def build_from_frame(data, type, channel, size)
       class_id, method_id = data.read(:short, :short)
@@ -16,20 +18,12 @@ class AMQPMethod
       return m
     end
 
-    def find_all_by_class_id
-      # FIXME
-    end
-
-    def find_all_by_class_name
-      # FIXME
-    end
-
-    def create(class_id, method_id)
-      # FIXME is this efficient?
-      p @@list
-      p class_id
-      p method_id
-      @@list[@@lookup[class_id][method_id]].clone
+    def create(klass, method)
+      if klass.is_a?(Fixnum)
+        return @@list[@@lookup[klass][method]].clone
+      elsif klass.is_a?(Symbol)
+        return @@list[@@lookup_by_sym[klass][method]].clone
+      end
     end
 
     def call_attr_accessor(sym)
@@ -48,11 +42,16 @@ class AMQPMethod
     @method_name = method_name
     @fields = Array.new
     @field_names = Array.new
+    @channel = 0
+    @type = 1
     block.call(self)
 
     @@list << self
     @@lookup[class_id] ||= Hash.new
     @@lookup[class_id][method_id] = @@list.length - 1
+    @@lookup_by_sym[class_name] ||= Hash.new
+    @@lookup_by_sym[class_name][method_name] = @@list.length - 1
+
   end
 
   # this method is here to pass data we got from frame inside into method
@@ -73,14 +72,56 @@ class AMQPMethod
   end
 
   def unpack(s)
-    fields.each do |fld|
-      send("#{fld[0]}=", s.read(fld[1]))
-    end
+    fields.each { |fld| send("#{fld[0]}=", s.read(fld[1])) }
     self
   end
 
   def pack
-    # FIXME
+    s = _pack(@class_id, :short) + _pack(@method_id, :short)
+    fields.each { |fld| s << _pack(send(fld[0]), fld[1]) }
+    _pack(@type, :octet) + _pack(@channel, :short) +
+            _pack(s, :longstr) + _pack(AMQP_FRAME_END, :octet)
+  end
+
+  def _pack(data, type)
+    case type
+      when :octet
+        return [data].pack("C")
+      when :short
+        return [data].pack("n")
+      when :long
+        return [data].pack("N")
+      when :longlong
+        # FIXME
+      when :shortstr
+        return [data.length].pack("C")+data
+      when :longstr
+        return [data.length].pack("N")+data
+      when :timestamp
+        # FIXME
+      when :bit
+        # FIXME
+      when :table
+        return _pack_table(data)
+      else
+        puts "FIXME unknown type #{type}"
+        raise
+    end
+  end
+
+  def _pack_table(t)
+    s = ''
+    t.each_pair do |key,val|
+      p = _pack(key.to_s, :shortstr)
+      if val.respond_to?(:chomp)
+        # string
+        p += 'S' + _pack(val, :longstr)
+      else
+        puts "FIXME _pack_table NOTIMPL"
+      end
+      s += p
+    end
+    _pack(s, :longstr)
   end
     
 end
@@ -188,48 +229,6 @@ String.class_eval do
 
 end
 
-
-#class Method
-#
-#  def self.build_from_frame(data)
-#    raise AMQPIncompleteFrame(:header) if data.length < 7
-#    type, chan, size = data.read(:octet, :short, :long)
-#    p "type #{type}"
-#    p "channel #{chan}"
-#    p "size #{size}"
-#
-#    raise AMQPIncompleteFrame(:payload) if data.length < size+8
-#    raise AMQPIncompleteFrame(:frame_end) if data[size+7] != AMQP_FRAME_END
-#
-#    # Method.new(data[7..size+7], type, chan, size)
-#    class_id, method_id = data.read(:short, :short)
-#    m = AMQPMethod.find(class_id, method_id).clone
-#    m.unpack(data)
-#
-#    exit    # FIXME NOTIMPL
-#  end
-#
-#  def initialize(data, type, chan, size)
-#    @class_id, @method_id = data.read(:short, :short)
-#    p "Received method: #{@class_id},#{@method_id}"
-#
-#
-#
-#    if @class_id == 10 && @method_id == 10
-#      @version_major, @minor = data.read(:octet, :octet)
-#    end
-#    p "B"
-#    puts @major, @minor
-#
-#    @prop = data.read(:table)
-#    p "C"
-#    p @prop
-#
-#    exit
-#
-#  end
-#
-#end
 
 end
 

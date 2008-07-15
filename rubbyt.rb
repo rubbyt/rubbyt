@@ -13,6 +13,7 @@ module Rubbyt
   DEFAULT_AMQP_MAJOR_VERSION = 8
   DEFAULT_AMQP_MINOR_VERSION = 0
   AMQPLAIN = "AMQPLAIN".freeze
+  DEFAULT_AMQP_LOCALE = 'en-US'.freeze
 
   # Exceptions
   class Exception < ::Exception; end
@@ -21,6 +22,7 @@ module Rubbyt
   class AMQPBadFrame < Exception; end
   class BufferOverflow < Exception; end
   class BrokerCompatError < Exception; end
+  class ProtocolError < Exception; end
 end
 
 require 'rubbyt/frame'

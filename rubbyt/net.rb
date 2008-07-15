@@ -40,7 +40,6 @@ module NonBlockingSocket
         m = AMQPMethod.build_from_frame(recv_buffer[7..size+7], type,
                                         channel, size)
         @recv_buffer = @recv_buffer[m.size+8..-1]
-        # puts "recv_buffer: '#{recv_buffer}'"
         return m
       end
     rescue AMQPIncompleteFrame, Errno::EAGAIN
@@ -51,16 +50,18 @@ module NonBlockingSocket
     end
   end
 
-  # TODO - make send_buffer an array of strings/methods instead of a string
   def send(blocking=false)
     begin
-      while not send_buffer.empty?
-        written = socket.write_nonblock(send_buffer)
+      unless @send_buffer.empty?
+        written = socket.write_nonblock(@send_buffer)
         @last_send = Time.now
-        #puts "sent #{written} bytes"
         @send_buffer = @send_buffer[written..-1]
-        #puts "now send_buffer is '#{send_buffer}'"
       end
+      unless @frame_buffer.empty?
+        @send_buffer << @frame_buffer.shift.pack
+        return send(blocking)       # recursion - beware
+      end
+      raise if blocking && !@send_buffer.empty? && !@frame_buffer.empty?
     rescue
       if blocking
         IO.select([socket])
@@ -68,9 +69,6 @@ module NonBlockingSocket
       end
     end
   end
-
-#  def wait
-#  end
 
 
 end

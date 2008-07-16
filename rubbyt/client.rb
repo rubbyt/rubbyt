@@ -26,9 +26,9 @@ class AMQPConnection
 
     @last_recv = nil
     @last_send = nil
-    @last_broker_heartbeat = nil
+    # @last_broker_heartbeat = nil   # not used for now
 
-    @client_properties ||= { :platform => "Ruby",
+    @client_properties = { :platform => "Ruby",
             :product => "Rubbyt",
             :information => "http://github.com/rubbyt/rubbyt",
             :version => "0.0",
@@ -52,12 +52,9 @@ class AMQPConnection
 
   def establish_amqp_connection
     amqp_send_protocol_header
-    amqp_recv_start
-    amqp_send_start_ok
-    amqp_recv_tune
-    amqp_send_tune_ok
-    amqp_send_open
-    amqp_recv_open_ok
+    process_amqp_connection_start
+    process_amqp_connection_tune
+    process_amqp_connection_open
     puts "established"
     self
   end
@@ -71,7 +68,7 @@ class AMQPConnection
     send(blocking=true)
   end
 
-  def amqp_recv_start
+  def process_amqp_connection_start
     m = recv(blocking=true)
     @server_properties = m.server_properties
 
@@ -84,33 +81,43 @@ class AMQPConnection
     # make sure major/minor are 8/0
     raise(BrokerCompatError,:major_minor_version_mismatch) unless
                 m.version_major == 8 && m.version_minor == 0
-  end
 
-  def amqp_send_start_ok
-    m = AMQPMethod.create(:connection, :start_ok)
-    m.mechanism = AMQPLAIN
-    m.response = { :LOGIN => @user, :PASSWORD => @pass }
-    m.locale = DEFAULT_AMQP_LOCALE
-    m.client_properties = @client_properties
-    @frame_buffer << m
+    # send start-ok
+    m1 = AMQPMethod.create(:connection, :start_ok)
+    m1.mechanism = AMQPLAIN
+    m1.response = { :LOGIN => @user, :PASSWORD => @pass }
+    m1.locale = DEFAULT_AMQP_LOCALE
+    m1.client_properties = @client_properties
+    @frame_buffer << m1
     send(blocking=true)
   end
 
-  def amqp_recv_tune
-    p "inside amqp_recv_tune"
+  def process_amqp_connection_tune
     m = recv(blocking=true)
-    p m
 
+    raise(ProtocolError,:unexpected_method) unless
+                m.method_name == :tune && m.class_name == :connection
+    
+    # send tune-ok
+    m1 = AMQPMethod.create(:connection, :tune_ok)
+
+    # FIXME TODO
+    # put more thought into it
+    # for now, we will just take whatever broker gives us
+    # in case of heartbeat, we don't want it for now
+    @channel_max = m.channel_max
+    @heartbeat = 0
+    @frame_max = m.frame_max
+    m1.channel_max = @channel_max
+    m1.heartbeat = @heartbeat
+    m1.frame_max = @frame_max
+    @frame_buffer << m1
+    send(blocking=true)
+  end
+
+  def process_amqp_connection_open
+    p "FIXME TODO NOTIMPL"
     exit
-  end
-
-  def amqp_send_tune_ok
-  end
-
-  def amqp_send_open
-  end
-
-  def amqp_recv_open_ok
   end
 
   #

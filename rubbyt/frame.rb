@@ -14,7 +14,6 @@ class AMQPMethod
       m.update(:type => type, :channel => channel, :size => size)
       m.unpack(data)
 
-      puts "\nBuilt AMQPMethod instance from frame:\n#{m.inspect}"
       return m
     end
 

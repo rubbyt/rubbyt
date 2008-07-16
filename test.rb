@@ -5,7 +5,8 @@
 require 'rubbyt'
 
 r = Rubbyt::AMQPConnection.new('127.0.0.1')
-puts "#{r.inspect}\n\n"
+p r
 
+puts "\n\n====\n\n"
 p r.connect
 

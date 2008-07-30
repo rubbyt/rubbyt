@@ -1,6 +1,10 @@
 
 module Rubbyt
 
+# this is not an error, it's an exception we use for flow control
+# when packing (see _pack method)
+class BitTypeField < Exception; end
+
 class AMQPMethod
   attr_reader :method_name, :class_name
   @@list = Array.new
@@ -53,6 +57,10 @@ class AMQPMethod
 
   end
 
+  def matches?(classname, methodname)
+    self.class_name == classname && self.method_name == methodname
+  end
+
   # this method is here to pass data we got from frame inside into method
   # FIXME
   # need a better way
@@ -76,8 +84,27 @@ class AMQPMethod
   end
 
   def pack
+    @pack_bits = []
     s = _pack(@class_id, :short) + _pack(@method_id, :short)
-    fields.each { |fld| s << _pack(send(fld[0]), fld[1]) }
+    fields.each { |fld|
+      begin
+        s << _pack(send(fld[0]), fld[1])
+      rescue BitTypeField
+        @pack_bits_start ||= s.length
+      end
+    }
+
+    unless @pack_bits.empty?
+      raise "FIXME 9+ bit fields in a method" if @pack_bits.length > 8
+      bits_value = 0
+      @pack_bits.each_with_index { |b, ind|
+        bits_value += 2 ** (8 - ind) if b
+      }
+      s.insert(@pack_bits_start, _pack(bits_value, :octet))
+      @pack_bits = [ ]
+      @pack_bits_start = nil
+    end
+
     _pack(@type, :octet) + _pack(@channel, :short) +
             _pack(s, :longstr) + _pack(AMQP_FRAME_END, :octet)
   end
@@ -100,6 +127,8 @@ class AMQPMethod
         # FIXME
       when :bit
         # FIXME
+        @pack_bits << data
+        raise BitTypeField
       when :table
         return _pack_table(data)
       else

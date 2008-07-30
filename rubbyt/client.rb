@@ -5,7 +5,7 @@ module Rubbyt
 
 class AMQPConnection
 
-  attr_reader :host, :port, :user, :pass, :vhost
+  attr_reader :host, :port, :user, :pass, :vhost, :params
   attr_reader :socket, :send_buffer, :recv_buffer, :frame_buffer
   attr_writer :last_recv, :last_send, :last_broker_heartbeat
   attr_reader :server_properties
@@ -14,10 +14,11 @@ class AMQPConnection
 
   def initialize(host, opts={})
     @host = host
-    @port = opts[:port] || DEFAULT_AMQP_PORT
-    @user = opts[:user] || DEFAULT_USER
-    @pass = opts[:pass] || opts[:password] || DEFAULT_PASS
-    @vhost = opts[:vhost] || DEFAULT_VHOST
+    @port = opts.delete(:port) || DEFAULT_AMQP_PORT
+    @user = opts.delete(:user) || DEFAULT_USER
+    @pass = opts.delete(:pass) || opts.delete(:password) || DEFAULT_PASS
+    @vhost = opts.delete(:vhost) || DEFAULT_VHOST
+    @params = opts
 
     @socket = nil
     @send_buffer = ""
@@ -74,7 +75,7 @@ class AMQPConnection
 
     # make sure it is a start method
     raise(ProtocolError,:unexpected_method) unless
-                m.method_name == :start && m.class_name == :connection
+                m.matches?(:connection, :start)
     # make sure broker supports AMQPLAIN
     raise(BrokerCompatError,:broker_does_not_support_amqplain) unless
                 m.mechanisms.split.include?(AMQPLAIN)
@@ -96,7 +97,7 @@ class AMQPConnection
     m = recv(blocking=true)
 
     raise(ProtocolError,:unexpected_method) unless
-                m.method_name == :tune && m.class_name == :connection
+        m.matches?(:connection, :tune)
     
     # send tune-ok
     m1 = AMQPMethod.create(:connection, :tune_ok)
@@ -108,16 +109,35 @@ class AMQPConnection
     @channel_max = m.channel_max
     @heartbeat = 0
     @frame_max = m.frame_max
+
     m1.channel_max = @channel_max
     m1.heartbeat = @heartbeat
     m1.frame_max = @frame_max
+
     @frame_buffer << m1
     send(blocking=true)
   end
 
   def process_amqp_connection_open
-    p "FIXME TODO NOTIMPL"
-    exit
+    # send open
+    m = AMQPMethod.create(:connection, :open)
+    m.virtual_host = @vhost
+    m.capabilities = ''
+    m.insist = params[:insist]
+
+    @frame_buffer << m
+    send(blocking=true)
+
+    m1 = recv(blocking=true)
+    # we can get connection.open-ok or connection.redirect
+    if m1.matches?(:connection, :open_ok)
+      @known_hosts = m1.known_hosts
+    elsif m1.matches?(:connection, :redirect)
+      # FIXME NOTIMPL TODO
+      raise(BrokerError,:redirect)
+    else
+      raise(ProtocolError, :unexpected_method)
+    end
   end
 
   #

@@ -26,8 +26,23 @@ end
 
 AMQPMethod.new(10, 31, :connection, :tune_ok) do |m|
   m.field :channel_max, :short
-  m.field :frame_max, :short
+  m.field :frame_max, :long
   m.field :heartbeat, :short
+end
+
+AMQPMethod.new(10, 40, :connection, :open) do |m|
+  m.field :virtual_host, :shortstr
+  m.field :capabilities, :shortstr
+  m.field :insist, :bit
+end
+
+AMQPMethod.new(10, 41, :connection, :open_ok) do |m|
+  m.field :known_hosts, :shortstr
+end
+
+AMQPMethod.new(10, 50, :connection, :redirect) do |m|
+  m.field :host, :shortstr
+  m.field :known_hosts, :shortstr
 end
 
 end

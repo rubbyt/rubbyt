@@ -45,5 +45,15 @@ AMQPMethod.new(10, 50, :connection, :redirect) do |m|
   m.field :known_hosts, :shortstr
 end
 
+AMQPMethod.new(10, 60, :connection, :close) do |m|
+  m.field :reply_code, :short
+  m.field :reply_text, :shortstr
+  m.field :class_id, :short
+  m.field :method_id, :short
+end
+
+AMQPMethod.new(10, 61, :connection, :close_ok) do |m|
+end
+
 end
 
